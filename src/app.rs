@@ -130,10 +130,13 @@ pub struct App {
 
 impl App {
     pub fn new(config: Config, stats: Stats, now: Instant) -> Self {
+        // The first phase waits for the user; later phases start running, see start_phase.
+        let mut timer = Timer::start(config.duration_for(Phase::Work), now);
+        timer.pause(now);
         Self {
             config,
             phase: Phase::Work,
-            timer: Timer::start(config.duration_for(Phase::Work), now),
+            timer,
             phase_started_wall: Local::now(),
             work_completed: 0,
             screen: Screen::default(),
@@ -200,7 +203,7 @@ impl App {
     fn timer_key(&mut self, key: KeyEvent) -> Vec<Effect> {
         let now = self.now;
         match key.code {
-            KeyCode::Char(' ') => self.timer.toggle(now),
+            KeyCode::Char(' ') => self.toggle_pause(),
             KeyCode::Char('s') => return self.skip(),
             KeyCode::Char('r') => self.reset(),
             KeyCode::Char('+' | '=') => self.timer.adjust(ADJUST_SECS, now),
@@ -208,6 +211,14 @@ impl App {
             _ => {}
         }
         Vec::new()
+    }
+
+    /// Toggle pause; resuming a phase that never ran is really its start.
+    fn toggle_pause(&mut self) {
+        if self.timer.is_paused() && self.timer.elapsed(self.now).is_zero() {
+            self.phase_started_wall = Local::now();
+        }
+        self.timer.toggle(self.now);
     }
 
     fn help_key(&mut self, key: KeyEvent) {
@@ -312,8 +323,13 @@ impl App {
     }
 
     /// Restart the current phase from its full configured length.
+    /// Resetting keeps the timer paused if it was paused.
     pub fn reset(&mut self) {
+        let was_paused = self.timer.is_paused();
         self.start_phase(self.phase, self.now);
+        if was_paused {
+            self.timer.pause(self.now);
+        }
     }
 
     fn start_phase(&mut self, phase: Phase, at: Instant) {
@@ -328,5 +344,61 @@ impl App {
             summary: format!("Pomodoro: {}", next.label()),
             body: format!("{what} {} for {minutes} min.", next.label()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn new_app(now: Instant) -> App {
+        App::new(Config::default(), Stats::new(Vec::new()), now)
+    }
+
+    #[test]
+    fn starts_paused() {
+        let app = new_app(Instant::now());
+        assert!(app.timer.is_paused());
+    }
+
+    #[test]
+    fn later_phases_start_running() {
+        let now = Instant::now();
+        let mut app = new_app(now);
+        app.timer.resume(now);
+        let _effects = app.tick(now + app.config.work);
+        assert_eq!(app.phase, Phase::ShortBreak);
+        assert!(!app.timer.is_paused());
+    }
+
+    #[test]
+    fn reset_keeps_paused_state() {
+        let now = Instant::now();
+        let mut app = new_app(now);
+        app.reset();
+        assert!(app.timer.is_paused());
+        app.timer.resume(now);
+        app.reset();
+        assert!(!app.timer.is_paused());
+    }
+
+    #[test]
+    fn first_resume_restamps_start_time() {
+        let now = Instant::now();
+        let mut app = new_app(now);
+        let before = app.phase_started_wall;
+        let space = KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE);
+        app.now = now;
+        app.handle_key(space);
+        assert!(app.phase_started_wall >= before);
+        assert!(!app.timer.is_paused());
+
+        app.now = now + Duration::from_secs(5);
+        app.handle_key(space);
+        assert!(app.timer.is_paused());
+        let started = app.phase_started_wall;
+        app.handle_key(space);
+        assert!(!app.timer.is_paused());
+        assert_eq!(app.phase_started_wall, started);
     }
 }

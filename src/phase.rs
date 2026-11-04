@@ -22,9 +22,9 @@ impl Phase {
 
     pub fn color(self) -> Color {
         match self {
-            Self::Work => Color::Red,
-            Self::ShortBreak => Color::Green,
-            Self::LongBreak => Color::Blue,
+            Self::Work => Color::Green,
+            Self::ShortBreak => Color::Yellow,
+            Self::LongBreak => Color::Cyan,
         }
     }
 

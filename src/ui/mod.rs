@@ -1,3 +1,4 @@
+mod art;
 mod help;
 mod settings;
 mod stats;
@@ -58,7 +59,7 @@ fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
         (Some(Popup::Help), _) => "esc / ? / q close",
         (Some(Popup::Settings), _) => SETTINGS_HINT,
         (None, Screen::Timer) => {
-            "space pause · s skip · r reset · +/- 1 min · tab stats · , settings · ? help · q quit"
+            "space start/pause · s skip · r reset · +/- 1 min · tab stats · , settings · ? help · q quit"
         }
         (None, Screen::Stats) => "tab timer · , settings · ? help · q quit",
     };

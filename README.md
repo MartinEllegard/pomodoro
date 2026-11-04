@@ -11,6 +11,8 @@ stats screen summarises.
 - Rust 1.89 or newer (see `rust-version` in `Cargo.toml`)
 - A terminal with Unicode support
 
+CI (`.github/workflows/ci.yml`) builds and tests on Linux, macOS and Windows.
+
 ## Install and run
 
 ```sh
@@ -44,7 +46,7 @@ Options:
 | Global   | `?`                         | Open help                               |
 | Global   | `,`                         | Open settings                           |
 | Global   | `tab` / `shift-tab` / `1` / `2` | Switch between Timer and Stats      |
-| Timer    | `space`                     | Pause / resume                          |
+| Timer    | `space`                     | Start / pause / resume                  |
 | Timer    | `s`                         | Skip the current phase                  |
 | Timer    | `r`                         | Restart the current phase               |
 | Timer    | `+` / `-`                   | Add / remove one minute on the running timer |
@@ -59,6 +61,8 @@ Options:
 - `-` never shortens the remaining time below one minute.
 - Skipping a work phase does not count as a completed pomodoro, so it cannot
   earn a long break.
+- The first work phase starts paused so you can begin when ready: press
+  `space` to start it. Every later phase starts running on its own.
 
 ## Session log
 
@@ -80,9 +84,17 @@ ignored when the log is read.
 ## Notifications
 
 Phase changes are sent as desktop notifications with
-[notify-rust](https://crates.io/crates/notify-rust) over D-Bus. A missing
-notification daemon or D-Bus session is not an error: the notification is
-dropped and the timer carries on.
+[notify-rust](https://crates.io/crates/notify-rust):
+
+- Linux and the BSDs: over D-Bus following the XDG notification spec, using
+  the pure-Rust `zbus` crate (no libdbus needed).
+- macOS: through `NSUserNotificationCenter`, which works from a plain binary
+  without an app bundle.
+- Windows: as toast notifications.
+
+On every platform a failure (no notification daemon, no D-Bus session, no
+permission) is not an error: the notification is dropped and the timer
+carries on.
 
 ## Architecture
 
@@ -96,7 +108,7 @@ dropped and the timer carries on.
 | `event_loop` | Async loop that drives `App` and executes its effects             |
 | `notify`     | Fire-and-forget desktop notifications                             |
 | `stats`      | Session records, JSONL storage and aggregation                    |
-| `ui`         | Rendering of the timer, stats, settings and help views            |
+| `ui`         | Rendering of the timer, phase pictogram, stats, settings and help views |
 
 The program runs on a tokio current-thread runtime. The event loop uses
 `tokio::select!` over a 250 ms tick and crossterm's `EventStream`;

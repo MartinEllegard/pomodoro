@@ -18,7 +18,7 @@ const SECTIONS: &[(&str, &[(&str, &str)])] = &[
     (
         "Timer",
         &[
-            ("space", "pause / resume"),
+            ("space", "start / pause / resume"),
             ("s", "skip phase"),
             ("r", "reset phase"),
             ("+ / = / -", "+/-1 min on the running timer"),
